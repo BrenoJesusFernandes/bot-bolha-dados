@@ -1,5 +1,6 @@
 from playwright.sync_api import Playwright, sync_playwright
 import urllib.parse
+from loguru import logger
 
 
 def run(play_wright: Playwright) -> None:
@@ -15,7 +16,7 @@ def run(play_wright: Playwright) -> None:
     page = context.new_page()
 
     # Parameters of url
-    query = urllib.parse.quote_plus('#asdfaerpawer9hjlasldk')
+    query = urllib.parse.quote_plus('@BolhaDados')
     src_option = urllib.parse.quote_plus('typed_query')
     twitter_url = 'https://twitter.com'
     from_option = urllib.parse.quote_plus('live')
@@ -29,20 +30,19 @@ def run(play_wright: Playwright) -> None:
                        r'div[1]/div/div[2]/div/section/div/div/div/div/div/div/article')
 
         if page.locator(tweet_xpath).count() == 0:
-            print('Pagina vazia!!!')
+            logger.info('Pagina vazia!!!')
             page.reload()
             page.wait_for_timeout(5000)
             continue
 
         tweets = page.locator(tweet_xpath)
-        print('Start: ', tweets.count())
-        tweets_id = []
+        logger.info(f'Quantidade Tweets Encontrados: "{tweets.count()}"')
 
+        tweets_id = []
         for index in range(tweets.count()):
             tweet = tweets.nth(index)
             tweets_id.append(tweet.get_attribute('aria-labelledby'))
 
-        print('------------')
         for t_id in tweets_id:
             event_elements = page.locator(f'article[aria-labelledby="{t_id}"]').locator('div[data-testid]')
 
@@ -54,7 +54,7 @@ def run(play_wright: Playwright) -> None:
                     event_element.click()
                     break
                 elif event_element.get_attribute('data-testid') == 'unlike':
-                    print('Nenhum Tweet Novo!!!')
+                    logger.info('Nenhum Tweet Novo Encontrado!!!')
                     is_new_tweet = False
 
             if not is_new_tweet:
@@ -62,7 +62,7 @@ def run(play_wright: Playwright) -> None:
 
             page.wait_for_timeout(1000)
 
-        print('Tudo feito!')
+        logger.success('Todos filtros aplicados!')
         page.reload()
         page.wait_for_timeout(5000)
 
