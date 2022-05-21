@@ -1,6 +1,4 @@
-import time
-
-from playwright.sync_api import Playwright, sync_playwright, expect, StorageState
+from playwright.sync_api import Playwright, sync_playwright
 import urllib.parse
 
 
@@ -17,39 +15,56 @@ def run(play_wright: Playwright) -> None:
     page = context.new_page()
 
     # Parameters of url
-    query = urllib.parse.quote_plus('#CienciaDeDados')
+    query = urllib.parse.quote_plus('#asdfaerpawer9hjlasldk')
     src_option = urllib.parse.quote_plus('typed_query')
     twitter_url = 'https://twitter.com'
     from_option = urllib.parse.quote_plus('live')
 
     full_url = fr'{twitter_url}/search?q={query}&src={src_option}&f={from_option}'
-
     page.goto(full_url)
-
     page.wait_for_timeout(5000)
 
-    tweets = page.locator(r'//*[@id="react-root"]/div/div/div[2]/main/div/div/div/'
-                          r'div[1]/div/div[2]/div/section/div/div/div/div/div/div/article')
+    while True:
+        tweet_xpath = (r'//*[@id="react-root"]/div/div/div[2]/main/div/div/div/'
+                       r'div[1]/div/div[2]/div/section/div/div/div/div/div/div/article')
 
-    print('Start: ', tweets.count())
+        if page.locator(tweet_xpath).count() == 0:
+            print('Pagina vazia!!!')
+            page.reload()
+            page.wait_for_timeout(5000)
+            continue
 
-    for index in range(8):
-        # Get a tweet
-        tweet = tweets.nth(index)
+        tweets = page.locator(tweet_xpath)
+        print('Start: ', tweets.count())
+        tweets_id = []
 
-        # Click in Like
-        tweet.locator('div[data-testid="like"]').click()
+        for index in range(tweets.count()):
+            tweet = tweets.nth(index)
+            tweets_id.append(tweet.get_attribute('aria-labelledby'))
 
-        # Click in retweet
-        # tweet.locator('div[data-testid="retweet"]').click()
-        # page.locator('div[data-testid="retweetConfirm"]').click()
+        print('------------')
+        for t_id in tweets_id:
+            event_elements = page.locator(f'article[aria-labelledby="{t_id}"]').locator('div[data-testid]')
 
-        time.sleep(1)
-        print('Middle: ', index, tweets.count())
+            is_new_tweet = True
+            for index in range(event_elements.count()):
+                event_element = event_elements.nth(index)
 
-    print('Final: ', tweets.count())
+                if event_element.get_attribute('data-testid') == 'like':
+                    event_element.click()
+                    break
+                elif event_element.get_attribute('data-testid') == 'unlike':
+                    print('Nenhum Tweet Novo!!!')
+                    is_new_tweet = False
 
-    page.wait_for_timeout(10 ** 5)
+            if not is_new_tweet:
+                break
+
+            page.wait_for_timeout(1000)
+
+        print('Tudo feito!')
+        page.reload()
+        page.wait_for_timeout(5000)
 
     page.screenshot(path='xablau.png')
     context.close()
