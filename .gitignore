@@ -1,3 +1,4 @@
 /.pytest_cache/
 /auth.json
 *.png
+/dev.env

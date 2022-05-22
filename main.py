@@ -1,76 +1,134 @@
-from playwright.sync_api import Playwright, sync_playwright
-import urllib.parse
+from playwright.async_api import Playwright, async_playwright, Page, Locator
 from loguru import logger
+from dataclasses import dataclass
+from typing import List
+import os
+import asyncio
 
 
-def run(play_wright: Playwright) -> None:
+@dataclass
+class TwitterBot:
     """
-    Just runs everything
-    :param play_wright: client
-    :return: None
+    Some explanation about this bot
     """
-    browser = play_wright.chromium.launch(headless=False)
+    client: Playwright
+    cookie_path: str
+    query: str
+    src_option: str
+    from_option: str
+    default_wait_time_ms: int
+    browser_visible: bool = True
 
-    # Load cookie
-    context = browser.new_context(storage_state='auth.json')
-    page = context.new_page()
+    async def __browser_init(self) -> Page:
+        browser = await self.client.chromium.launch(headless=not self.browser_visible)
 
-    # Parameters of url
-    query = urllib.parse.quote_plus('@BolhaDados')
-    src_option = urllib.parse.quote_plus('typed_query')
-    twitter_url = 'https://twitter.com'
-    from_option = urllib.parse.quote_plus('live')
+        context = await browser.new_context(storage_state=self.cookie_path)
+        page = await context.new_page()
 
-    full_url = fr'{twitter_url}/search?q={query}&src={src_option}&f={from_option}'
-    page.goto(full_url)
-    page.wait_for_timeout(5000)
+        full_url = (fr'https://twitter.com/'
+                    fr'search?q={self.query}&'
+                    fr'src={self.src_option}&'
+                    fr'f={self.from_option}')
 
-    while True:
-        tweet_xpath = (r'//*[@id="react-root"]/div/div/div[2]/main/div/div/div/'
-                       r'div[1]/div/div[2]/div/section/div/div/div/div/div/div/article')
+        await page.goto(full_url)
+        await page.wait_for_timeout(self.default_wait_time_ms)
 
-        if page.locator(tweet_xpath).count() == 0:
-            logger.info('Pagina vazia!!!')
-            page.reload()
-            page.wait_for_timeout(5000)
-            continue
+        return page
 
-        tweets = page.locator(tweet_xpath)
-        logger.info(f'Quantidade Tweets Encontrados: "{tweets.count()}"')
+    async def __is_tweets(self, page: Page) -> bool:
 
-        tweets_id = []
-        for index in range(tweets.count()):
-            tweet = tweets.nth(index)
-            tweets_id.append(tweet.get_attribute('aria-labelledby'))
+        if page.locator(self.__get_tweets_xpath).count() == 0:
+            logger.info("Hmmm... There's no new tweet to interact.")
+            return False
 
-        for t_id in tweets_id:
-            event_elements = page.locator(f'article[aria-labelledby="{t_id}"]').locator('div[data-testid]')
+        return True
 
-            is_new_tweet = True
-            for index in range(event_elements.count()):
-                event_element = event_elements.nth(index)
+    async def __is_not_interacted_tweets(self, page: Locator) -> bool:
 
-                if event_element.get_attribute('data-testid') == 'like':
-                    event_element.click()
+        if page.locator(self.__get_tweets_xpath).count() == 0:
+            logger.info("Hmmm... There's no new tweet to interact.")
+            return False
+
+        return True
+
+    @property
+    def __get_tweets_xpath(self) -> str:
+        return (r'//*[@id="react-root"]/div/div/div[2]/main/div/div/div/'
+                r'div[1]/div/div[2]/div/section/div/div/div/div/div/div/'
+                r'article')
+
+    async def __interact_tweets(self, page: Page, tweets_locator: Locator, actions: List[str]):
+
+        logger.info(f'Amount Tweets Founded: "{tweets_locator.count()}"')
+
+        if await self.__is_not_interacted_tweets(tweets_locator):
+            tweets_id: List[str] = await self.__find_tweets_id(tweets_locator)
+
+            for t_id in tweets_id:
+                event_elements = page.locator(f'article[aria-labelledby="{t_id}"]').locator('div[data-testid]')
+
+                is_new_tweet = True
+                for index in range(await event_elements.count()):
+                    event_element = event_elements.nth(index)
+
+                    if event_element.get_attribute('data-testid') == 'like':
+                        await event_element.click()
+                        break
+                    elif event_element.get_attribute('data-testid') == 'unlike':
+                        logger.info('There is not new tweet!!!')
+                        is_new_tweet = False
+
+                if not is_new_tweet:
                     break
-                elif event_element.get_attribute('data-testid') == 'unlike':
-                    logger.info('Nenhum Tweet Novo Encontrado!!!')
-                    is_new_tweet = False
 
-            if not is_new_tweet:
-                break
+                await page.wait_for_timeout(1000)
 
-            page.wait_for_timeout(1000)
+    async def __reload_page(self, page: Page):
+        logger.success('Refreshing page ...')
+        await page.reload()
+        await page.wait_for_timeout(self.default_wait_time_ms)
 
-        logger.success('Todos filtros aplicados!')
-        page.reload()
-        page.wait_for_timeout(5000)
+    @staticmethod
+    async def __find_tweets_id(tweets_locator: Locator) -> List[str]:
+        tot = await tweets_locator.count()
+        tweets_id = []
+        for index in range(tot):
+            tweet_element = tweets_locator.nth(index)
+            tweets_id.append(await tweet_element.get_attribute('aria-labelledby'))
 
-    page.screenshot(path='xablau.png')
-    context.close()
-    browser.close()
+        return tweets_id
+
+    async def __like_tweet(self):
+        ...
+
+    async def __retweet_tweet(self):
+        ...
+
+    async def run(self):
+        page = await self.__browser_init()
+
+        while True:
+            try:
+                if await self.__is_tweets(page):
+                    tweets_locator = page.locator(self.__get_tweets_xpath)
+                    await self.__interact_tweets(page, tweets_locator, actions=['like', 'retweet'])
+
+                await self.__reload_page(page)
+            except Exception as error:
+                logger.error(error)
+
+
+async def main() -> None:
+    async with async_playwright() as play_wright:
+        bolha_dados_bot = TwitterBot(client=play_wright,
+                                     cookie_path=os.getenv('COOKIE_PATH'),
+                                     query=os.getenv('TWITTER_QUERY'),
+                                     src_option=os.getenv('SRC_OPTION'),
+                                     from_option=os.getenv('FROM_OPTION'),
+                                     default_wait_time_ms=int(os.getenv('DEFAULT_TIME_WAIT_MS')),
+                                     browser_visible=bool(os.getenv('BROWSER_VISIBLE')))
+        await bolha_dados_bot.run()
 
 
 if __name__ == '__main__':
-    with sync_playwright() as playwright:
-        run(playwright)
+    asyncio.run(main())
