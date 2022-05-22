@@ -1,1 +1,1 @@
-worker: python main.py
+worker: python bolha_dados/main.py
