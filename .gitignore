@@ -1,4 +1,4 @@
 /.pytest_cache/
-/auth.json
+/bolha_dados/auth.json
 *.png
 /dev.env
