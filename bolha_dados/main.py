@@ -122,6 +122,9 @@ class TwitterBot:
 
 
 async def default_task(cookie: StorageState):
+    """
+    Some comment here
+    """
     while True:
         try:
             async with async_playwright() as play_wright:
