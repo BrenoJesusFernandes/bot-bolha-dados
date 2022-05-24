@@ -1,16 +1,11 @@
-from playwright.async_api import Playwright, async_playwright, Page, Locator
+from playwright.async_api import Playwright, async_playwright, Page, Locator, StorageState, Cookie
 from loguru import logger
 from dataclasses import dataclass
 from typing import List
 import os
 import asyncio
-import time
 import urllib.parse
-
-import sys
-from subprocess import Popen, PIPE
-
-p = Popen([sys.executable, "-m", "playwright", "install"], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+import requests
 
 
 @dataclass
@@ -19,7 +14,7 @@ class TwitterBot:
     Some explanation about this bot
     """
     client: Playwright
-    cookie_path: str
+    cookie_path: StorageState
     query: str
     src_option: str
     from_option: str
@@ -116,28 +111,38 @@ class TwitterBot:
     async def run(self):
 
         page = await self.__browser_init()
-        try:
-            if await self.__is_tweets(page):
-                tweets_locator = page.locator(self.__get_tweets_xpath)
-                await self.__interact_tweets(page, tweets_locator, actions=['like', 'retweet'])
 
-            await page.close()
+        if await self.__is_tweets(page):
+            tweets_locator = page.locator(self.__get_tweets_xpath)
+            await self.__interact_tweets(page, tweets_locator, actions=['like', 'retweet'])
+
+        await page.close()
+
+
+async def default_task(cookie: StorageState):
+    while True:
+        try:
+            async with async_playwright() as play_wright:
+                bolha_dados_bot = TwitterBot(client=play_wright,
+                                             cookie_path=cookie,
+                                             query=urllib.parse.quote(os.getenv('TWITTER_QUERY')),
+                                             src_option=urllib.parse.quote(os.getenv('SRC_OPTION')),
+                                             from_option=urllib.parse.quote(os.getenv('FROM_OPTION')),
+                                             default_wait_time_ms=int(os.getenv('DEFAULT_TIME_WAIT_MS')),
+                                             browser_visible=bool(os.getenv('BROWSER_VISIBLE')))
+                await bolha_dados_bot.run()
+
         except Exception as error:
             logger.error(error)
 
 
 async def main() -> None:
-    while True:
-        async with async_playwright() as play_wright:
-            bolha_dados_bot = TwitterBot(client=play_wright,
-                                         cookie_path=os.getenv('COOKIE_PATH'),
-                                         query=urllib.parse.quote(os.getenv('TWITTER_QUERY')),
-                                         src_option=urllib.parse.quote(os.getenv('SRC_OPTION')),
-                                         from_option=urllib.parse.quote(os.getenv('FROM_OPTION')),
-                                         default_wait_time_ms=int(os.getenv('DEFAULT_TIME_WAIT_MS')),
-                                         browser_visible=bool(os.getenv('BROWSER_VISIBLE')))
-            await bolha_dados_bot.run()
+    with requests.get(url=os.getenv('COOKIE_URL')) as resp:
 
+        if resp.status_code == 200:
+            await default_task(StorageState(resp.json()))
+        else:
+            logger.error('Error to download the cookie!')
 
 if __name__ == '__main__':
     asyncio.run(main())
