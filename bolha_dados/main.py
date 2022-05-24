@@ -28,7 +28,7 @@ class TwitterBot:
 
     async def __browser_init(self) -> Page:
         browser = await self.client.chromium.launch(chromium_sandbox=False,
-                                                    headless=not self.browser_visible)
+                                                    headless=False)
 
         context = await browser.new_context(storage_state=self.cookie_path)
         page = await context.new_page()
@@ -114,29 +114,29 @@ class TwitterBot:
         ...
 
     async def run(self):
+
         page = await self.__browser_init()
+        try:
+            if await self.__is_tweets(page):
+                tweets_locator = page.locator(self.__get_tweets_xpath)
+                await self.__interact_tweets(page, tweets_locator, actions=['like', 'retweet'])
 
-        while True:
-            try:
-                if await self.__is_tweets(page):
-                    tweets_locator = page.locator(self.__get_tweets_xpath)
-                    await self.__interact_tweets(page, tweets_locator, actions=['like', 'retweet'])
-
-                await self.__reload_page(page)
-            except Exception as error:
-                logger.error(error)
+            await page.close()
+        except Exception as error:
+            logger.error(error)
 
 
 async def main() -> None:
-    async with async_playwright() as play_wright:
-        bolha_dados_bot = TwitterBot(client=play_wright,
-                                     cookie_path=os.getenv('COOKIE_PATH'),
-                                     query=urllib.parse.quote(os.getenv('TWITTER_QUERY')),
-                                     src_option=urllib.parse.quote(os.getenv('SRC_OPTION')),
-                                     from_option=urllib.parse.quote(os.getenv('FROM_OPTION')),
-                                     default_wait_time_ms=int(os.getenv('DEFAULT_TIME_WAIT_MS')),
-                                     browser_visible=bool(os.getenv('BROWSER_VISIBLE')))
-        await bolha_dados_bot.run()
+    while True:
+        async with async_playwright() as play_wright:
+            bolha_dados_bot = TwitterBot(client=play_wright,
+                                         cookie_path=os.getenv('COOKIE_PATH'),
+                                         query=urllib.parse.quote(os.getenv('TWITTER_QUERY')),
+                                         src_option=urllib.parse.quote(os.getenv('SRC_OPTION')),
+                                         from_option=urllib.parse.quote(os.getenv('FROM_OPTION')),
+                                         default_wait_time_ms=int(os.getenv('DEFAULT_TIME_WAIT_MS')),
+                                         browser_visible=bool(os.getenv('BROWSER_VISIBLE')))
+            await bolha_dados_bot.run()
 
 
 if __name__ == '__main__':

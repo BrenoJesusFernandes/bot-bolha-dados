@@ -1,1 +1,1 @@
-worker: python bolha_dados/main.py
+worker: playwright install; python bolha_dados/main.py
