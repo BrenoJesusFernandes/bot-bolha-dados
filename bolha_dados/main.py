@@ -75,10 +75,12 @@ class TwitterBot:
                     event_element = event_elements.nth(index)
 
                     data_testid = await event_element.get_attribute('data-testid')
-                    if data_testid == 'like':
+                    if data_testid == 'retweet':
+                        logger.info('Retwitando ...')
                         await event_element.click()
+                        await page.locator('[data-testid="retweetConfirm"]').click()
                         break
-                    elif data_testid == 'unlike':
+                    elif data_testid == 'unretweet':
                         logger.info('There is not new tweet!!!')
                         is_new_tweet = False
 
