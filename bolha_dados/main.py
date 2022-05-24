@@ -23,7 +23,7 @@ class TwitterBot:
 
     async def __browser_init(self) -> Page:
         browser = await self.client.chromium.launch(chromium_sandbox=False,
-                                                    headless=False)
+                                                    headless=True)
 
         context = await browser.new_context(storage_state=self.cookie_path)
         page = await context.new_page()
