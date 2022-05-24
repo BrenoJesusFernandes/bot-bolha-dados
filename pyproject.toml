@@ -5,9 +5,10 @@ description = ""
 authors = ["Breno Fernandes <brenojesusfernandes@pm.com>"]
 
 [tool.poetry.dependencies]
-python = "3.7.13"
+python = "3.7.4"
 playwright = "1.22.0"
 loguru = "0.6.0"
+requests = "^2.27.1"
 
 [tool.poetry.dev-dependencies]
 
